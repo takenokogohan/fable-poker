@@ -193,6 +193,39 @@ label {
   color: var(--accent);
 }
 
+.tightness-pills {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.pill {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 12px;
+}
+
+.pill.active {
+  background: #2e6da4;
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.custom-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #2e5d3a;
+  color: #9fe0ae;
+  font-size: 11px;
+  font-weight: 400;
+  vertical-align: 1px;
+}
+
+.save-btn {
+  border-color: #3f7a4d;
+}
+
 .range-tools {
   display: flex;
   align-items: center;
@@ -568,14 +601,18 @@ label {
   }
 
   .ranges-row {
-    flex-direction: column;
-    gap: 14px;
+    /* column flex + aspect-ratio grid cells -> circular height computation
+       that under-sizes the editors; plain block flow stacks them correctly */
+    display: block;
   }
 
   .range-editor {
-    /* flex: 1 in a column container squeezes the editors into each other */
-    flex: none;
     min-width: 0;
+    margin-bottom: 16px;
+  }
+
+  .range-editor:last-child {
+    margin-bottom: 0;
   }
 
   /* iOS Safari zooms the page when focusing inputs with font-size < 16px */

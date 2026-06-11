@@ -14,7 +14,8 @@
     "test:cache": "node cache-test.mjs",
     "test:mobile": "node mobile-test.mjs",
     "compare:gtow": "node compare-gtow.mjs",
-    "gen-icons": "node gen-icons.mjs"
+    "gen-icons": "node gen-icons.mjs",
+    "test:custom-range": "node custom-range-test.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

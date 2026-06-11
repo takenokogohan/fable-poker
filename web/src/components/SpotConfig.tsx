@@ -11,6 +11,12 @@ import {
   type PotType,
   type Tightness,
 } from "../ranges";
+import {
+  clearCustomRange,
+  loadCustomRange,
+  saveCustomRange,
+  type Side,
+} from "../customRanges";
 import type { SpotConfig } from "../types";
 import CardPicker from "./CardPicker";
 import RangeMatrix from "./RangeMatrix";
@@ -69,12 +75,22 @@ export default function SpotConfigView({ onSolve }: Props) {
   const [opener, setOpener] = useState<Position>("BTN");
   const [defender, setDefender] = useState<Position>("BB");
   const [potType, setPotType] = useState<PotType>("srp");
-  const [tightness, setTightness] = useState<Tightness>("normal");
+  // tightness is per player (e.g. tight BB vs loose BTN)
+  const [openerT, setOpenerT] = useState<Tightness>("normal");
+  const [defenderT, setDefenderT] = useState<Tightness>("normal");
 
   const scenario = useMemo(
-    () => buildScenario(opener, defender, potType, tightness),
-    [opener, defender, potType, tightness]
+    () => buildScenario(opener, defender, potType, openerT, defenderT),
+    [opener, defender, potType, openerT, defenderT]
   );
+  // which displayed side (oop/ip) belongs to the opener
+  const oopIsOpener = scenario.oopName === opener;
+  const sideT = (side: Side): Tightness =>
+    (side === "oop") === oopIsOpener ? openerT : defenderT;
+  const setSideT = (side: Side, t: Tightness) => {
+    if ((side === "oop") === oopIsOpener) setOpenerT(t);
+    else setDefenderT(t);
+  };
 
   // ranges/pot/stack are editable overrides on top of the scenario
   const [overrides, setOverrides] = useState<{
@@ -84,13 +100,37 @@ export default function SpotConfigView({ onSolve }: Props) {
     pot?: number;
     stack?: number;
   }>({ key: "" });
-  const scenarioKey = `${opener}-${defender}-${potType}-${tightness}`;
+  const scenarioKey = `${opener}-${defender}-${potType}-${openerT}-${defenderT}`;
   const ov = overrides.key === scenarioKey ? overrides : { key: scenarioKey };
 
-  const oopRange = ov.oop ?? scenario.oopRange;
-  const ipRange = ov.ip ?? scenario.ipRange;
+  // user-saved ranges for this slot take precedence over the preset
+  const [customVersion, setCustomVersion] = useState(0);
+  const customOop = useMemo(
+    () => loadCustomRange(opener, defender, potType, sideT("oop"), "oop"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scenarioKey, customVersion]
+  );
+  const customIp = useMemo(
+    () => loadCustomRange(opener, defender, potType, sideT("ip"), "ip"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scenarioKey, customVersion]
+  );
+
+  const oopRange = ov.oop ?? customOop ?? scenario.oopRange;
+  const ipRange = ov.ip ?? customIp ?? scenario.ipRange;
   const pot = ov.pot ?? scenario.pot;
   const stack = ov.stack ?? scenario.stack;
+
+  const saveRange = (side: Side, grid: Float32Array) => {
+    saveCustomRange(opener, defender, potType, sideT(side), side, grid);
+    setOverrides({ ...ov, [side === "oop" ? "oop" : "ip"]: undefined });
+    setCustomVersion((v) => v + 1);
+  };
+  const resetRange = (side: Side) => {
+    clearCustomRange(opener, defender, potType, sideT(side), side);
+    setOverrides({ ...ov, [side === "oop" ? "oop" : "ip"]: undefined });
+    setCustomVersion((v) => v + 1);
+  };
 
   const [boardText, setBoardText] = useState("Ks7h2d");
   const [treePresetManual, setTreePresetManual] =
@@ -188,20 +228,6 @@ export default function SpotConfigView({ onSolve }: Props) {
               ))}
             </div>
           </div>
-          <div className="pos-group">
-            <span className="pos-label">レンジの広さ</span>
-            <div className="pos-buttons">
-              {(Object.keys(TIGHTNESS_LABELS) as Tightness[]).map((t) => (
-                <button
-                  key={t}
-                  className={"pos-btn" + (tightness === t ? " active" : "")}
-                  onClick={() => setTightness(t)}
-                >
-                  {TIGHTNESS_LABELS[t]}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
         <p className="scenario-desc">{scenario.description}</p>
         <div className="pot-stack">
@@ -235,13 +261,28 @@ export default function SpotConfigView({ onSolve }: Props) {
             title={`OOP: ${scenario.oopName}`}
             grid={oopRange}
             onChange={(g) => setOverrides({ ...ov, oop: g })}
+            isCustom={customOop !== null}
+            onSave={() => saveRange("oop", oopRange)}
+            onResetPreset={() => resetRange("oop")}
+            tightness={sideT("oop")}
+            onTightnessChange={(t) => setSideT("oop", t)}
           />
           <RangeMatrix
             title={`IP: ${scenario.ipName}`}
             grid={ipRange}
             onChange={(g) => setOverrides({ ...ov, ip: g })}
+            isCustom={customIp !== null}
+            onSave={() => saveRange("ip", ipRange)}
+            onResetPreset={() => resetRange("ip")}
+            tightness={sideT("ip")}
+            onTightnessChange={(t) => setSideT("ip", t)}
           />
         </div>
+        <p className="hint">
+          レンジの広さ (タイト/ノーマル/ルース) はプレイヤー毎に選べます。
+          「保存」でこの組み合わせ (ポジション×ポットタイプ×広さ)
+          のレンジとして端末に保存され、次回から自動で使われます。
+        </p>
       </section>
 
       <section className="panel">

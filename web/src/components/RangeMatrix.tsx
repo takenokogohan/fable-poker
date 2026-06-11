@@ -3,15 +3,38 @@
 
 import { useCallback, useRef, useState } from "react";
 import { gridLabel } from "../poker";
-import { parseRange, rangePercent } from "../ranges";
+import {
+  parseRange,
+  rangePercent,
+  TIGHTNESS_LABELS,
+  type Tightness,
+} from "../ranges";
 
 interface Props {
   title: string;
   grid: Float32Array;
   onChange: (g: Float32Array) => void;
+  /** a saved custom range is active for this slot */
+  isCustom?: boolean;
+  /** persist the current grid for this slot */
+  onSave?: () => void;
+  /** drop the saved custom range and return to the preset */
+  onResetPreset?: () => void;
+  /** per-player preset tightness selector */
+  tightness?: Tightness;
+  onTightnessChange?: (t: Tightness) => void;
 }
 
-export default function RangeMatrix({ title, grid, onChange }: Props) {
+export default function RangeMatrix({
+  title,
+  grid,
+  onChange,
+  isCustom,
+  onSave,
+  onResetPreset,
+  tightness,
+  onTightnessChange,
+}: Props) {
   const [brush, setBrush] = useState(100);
   const [text, setText] = useState("");
   const painting = useRef<null | number>(null); // weight being painted
@@ -60,9 +83,25 @@ export default function RangeMatrix({ title, grid, onChange }: Props) {
   return (
     <div className="range-editor">
       <div className="range-header">
-        <span className="range-title">{title}</span>
+        <span className="range-title">
+          {title}
+          {isCustom && <span className="custom-badge">カスタム</span>}
+        </span>
         <span className="range-pct">{rangePercent(grid).toFixed(1)}%</span>
       </div>
+      {tightness && onTightnessChange && (
+        <div className="tightness-pills">
+          {(Object.keys(TIGHTNESS_LABELS) as Tightness[]).map((t) => (
+            <button
+              key={t}
+              className={"pill" + (tightness === t ? " active" : "")}
+              onClick={() => onTightnessChange(t)}
+            >
+              {TIGHTNESS_LABELS[t]}
+            </button>
+          ))}
+        </div>
+      )}
       <div
         className="matrix paint-matrix"
         onPointerMove={handleMove}
@@ -105,6 +144,14 @@ export default function RangeMatrix({ title, grid, onChange }: Props) {
           />
         </label>
         <button onClick={() => onChange(new Float32Array(169))}>クリア</button>
+        {onSave && (
+          <button className="save-btn" onClick={onSave}>
+            保存
+          </button>
+        )}
+        {onResetPreset && isCustom && (
+          <button onClick={onResetPreset}>プリセットに戻す</button>
+        )}
       </div>
       <div className="range-import">
         <input

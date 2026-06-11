@@ -379,9 +379,9 @@ export function buildScenario(
   opener: Position,
   defender: Position,
   potType: PotType,
-  tightness: Tightness = "normal"
+  openerTightness: Tightness = "normal",
+  defenderTightness: Tightness = openerTightness
 ): Scenario {
-  const t = tightness;
   const openTo = opener === "SB" ? 3 : 2.5;
   const defenderIsBlind = defender === "SB" || defender === "BB";
   const threeBetTo = defenderIsBlind
@@ -399,27 +399,29 @@ export function buildScenario(
   let committed: number;
   let description: string;
 
-  const rfi = parseRange(RFI[opener][t]);
+  const ot = openerTightness;
+  const dt = defenderTightness;
+  const rfi = parseRange(RFI[opener][ot]);
   const openerInPosition =
     POSTFLOP_ORDER.indexOf(opener) > POSTFLOP_ORDER.indexOf(defender);
   if (potType === "srp") {
     openerRange = rfi;
-    defenderRange = flatVsOpen(defender, opener, t);
+    defenderRange = flatVsOpen(defender, opener, dt);
     committed = openTo;
     description = `${opener} ${openTo}bb オープン → ${defender} コール`;
   } else if (potType === "3bp") {
     openerRange = intersect(
-      parseRange(openerInPosition ? CALL_3BET_IP[t] : CALL_3BET_OOP[t]),
+      parseRange(openerInPosition ? CALL_3BET_IP[ot] : CALL_3BET_OOP[ot]),
       rfi
     );
-    defenderRange = threeBetVsOpen(defender, opener, t);
+    defenderRange = threeBetVsOpen(defender, opener, dt);
     committed = threeBetTo;
     description = `${opener} オープン → ${defender} ${threeBetTo}bb 3bet → ${opener} コール`;
   } else {
-    openerRange = intersect(parseRange(FOURBET_RANGE[t]), rfi);
+    openerRange = intersect(parseRange(FOURBET_RANGE[ot]), rfi);
     defenderRange = intersect(
-      parseRange(CALL_4BET[t]),
-      threeBetVsOpen(defender, opener, t)
+      parseRange(CALL_4BET[dt]),
+      threeBetVsOpen(defender, opener, dt)
     );
     committed = fourBetTo;
     description = `${opener} オープン → ${defender} 3bet → ${opener} ${fourBetTo}bb 4bet → ${defender} コール`;
