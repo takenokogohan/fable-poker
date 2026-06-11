@@ -1,0 +1,30 @@
+{
+  "name": "fable-poker-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build && node postbuild-sw.mjs",
+    "preview": "vite preview",
+    "test:smoke": "node smoke-test.mjs",
+    "test:cluster": "node smoke-cluster.mjs",
+    "test:ui": "node ui-test.mjs",
+    "test:cache": "node cache-test.mjs",
+    "test:mobile": "node mobile-test.mjs",
+    "compare:gtow": "node compare-gtow.mjs",
+    "gen-icons": "node gen-icons.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright": "^1.60.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
