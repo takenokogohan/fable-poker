@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build && node postbuild-sw.mjs",
     "preview": "vite preview",
+    "test:ranges": "node check-ranges.mjs",
     "test:smoke": "node smoke-test.mjs",
     "test:cluster": "node smoke-cluster.mjs",
     "test:ui": "node ui-test.mjs",

@@ -5,9 +5,11 @@ import { cardToString, parseBoard } from "../poker";
 import {
   buildScenario,
   OPENER_POSITIONS,
+  TIGHTNESS_LABELS,
   validDefenders,
   type Position,
   type PotType,
+  type Tightness,
 } from "../ranges";
 import type { SpotConfig } from "../types";
 import CardPicker from "./CardPicker";
@@ -67,10 +69,11 @@ export default function SpotConfigView({ onSolve }: Props) {
   const [opener, setOpener] = useState<Position>("BTN");
   const [defender, setDefender] = useState<Position>("BB");
   const [potType, setPotType] = useState<PotType>("srp");
+  const [tightness, setTightness] = useState<Tightness>("normal");
 
   const scenario = useMemo(
-    () => buildScenario(opener, defender, potType),
-    [opener, defender, potType]
+    () => buildScenario(opener, defender, potType, tightness),
+    [opener, defender, potType, tightness]
   );
 
   // ranges/pot/stack are editable overrides on top of the scenario
@@ -81,7 +84,7 @@ export default function SpotConfigView({ onSolve }: Props) {
     pot?: number;
     stack?: number;
   }>({ key: "" });
-  const scenarioKey = `${opener}-${defender}-${potType}`;
+  const scenarioKey = `${opener}-${defender}-${potType}-${tightness}`;
   const ov = overrides.key === scenarioKey ? overrides : { key: scenarioKey };
 
   const oopRange = ov.oop ?? scenario.oopRange;
@@ -181,6 +184,20 @@ export default function SpotConfigView({ onSolve }: Props) {
                   onClick={() => setPotType(t.id)}
                 >
                   {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="pos-group">
+            <span className="pos-label">レンジの広さ</span>
+            <div className="pos-buttons">
+              {(Object.keys(TIGHTNESS_LABELS) as Tightness[]).map((t) => (
+                <button
+                  key={t}
+                  className={"pos-btn" + (tightness === t ? " active" : "")}
+                  onClick={() => setTightness(t)}
+                >
+                  {TIGHTNESS_LABELS[t]}
                 </button>
               ))}
             </div>
