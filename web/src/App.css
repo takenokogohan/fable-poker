@@ -570,6 +570,69 @@ label {
   margin: 0 0 8px;
 }
 
+/* ---- image analysis ---- */
+.image-entry {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  background: var(--panel-2);
+  border: 1px dashed var(--border);
+}
+
+.image-entry:hover {
+  border-color: var(--accent);
+}
+
+.image-analyze .img-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.img-cards {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.eval-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.eval-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-weight: 400;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.eval-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #262d3a;
+}
+
+.v-good {
+  color: #54a953;
+  font-weight: 600;
+}
+
+.v-ok {
+  color: #e8b34c;
+  font-weight: 600;
+}
+
+.v-bad {
+  color: #e25757;
+  font-weight: 600;
+}
+
 /* ---- touch ---- */
 .paint-matrix {
   touch-action: none; /* drag paints instead of scrolling */

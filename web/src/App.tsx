@@ -5,6 +5,7 @@ import CardPicker from "./components/CardPicker";
 import HandDetail from "./components/HandDetail";
 import SpotConfigView from "./components/SpotConfig";
 import StrategyMatrix from "./components/StrategyMatrix";
+import ImageAnalyze from "./components/ImageAnalyze";
 import { cacheGet, cacheKey, cachePut } from "./idb";
 import {
   STREET_NAMES,
@@ -23,7 +24,7 @@ import type { NodeData, SpotConfig } from "./types";
 import { buildConfigText } from "./types";
 import type { SessionMeta } from "./cluster";
 
-type Phase = "config" | "loading" | "solving";
+type Phase = "config" | "loading" | "solving" | "image";
 type CacheState = "none" | "restored" | "saving" | "saved";
 
 interface PathStep {
@@ -232,7 +233,18 @@ export default function App() {
           </span>
         </header>
         {error && <div className="error">{error}</div>}
+        <button className="image-entry" onClick={() => setPhase("image")}>
+          📷 ハンド画像から解析
+        </button>
         <SpotConfigView onSolve={startSolve} />
+      </div>
+    );
+  }
+
+  if (phase === "image") {
+    return (
+      <div className="app">
+        <ImageAnalyze onClose={() => setPhase("config")} />
       </div>
     );
   }
