@@ -21,6 +21,7 @@ import {
   RANKS,
   SUIT_COLORS,
   SUIT_SYMBOLS,
+  handToCell,
   parseCard,
   rankOf,
   suitOf,
@@ -83,6 +84,32 @@ const ACTION_JA: Record<string, string> = {
   fold: "フォールド", check: "チェック", call: "コール", bet: "ベット", raise: "レイズ",
 };
 
+/** Preflop verdict: is the hero's hand in the preset range for the line they
+ * took? (combo weight in the reconstructed range). */
+function PreflopEval({ hand, scen }: { hand: ParsedHand; scen: SpotMapping }) {
+  const range = scen.heroIsOop ? scen.oopRange : scen.ipRange;
+  const w = range ? range[handToCell(hand.heroCards.join(""))] ?? 0 : 0;
+  const actions = (hand.streets.find((s) => s.street === "preflop")?.actions ?? [])
+    .filter((a) => a.position === hand.heroPosition)
+    .map((a) => ACTION_JA[a.action] ?? a.action)
+    .join(" → ");
+  const cls = w >= 0.85 ? "v-good" : w > 0 ? "v-ok" : "v-bad";
+  const label =
+    w >= 0.85
+      ? "✓ 標準レンジ内"
+      : w > 0
+        ? `△ 混合域(頻度 ${(w * 100).toFixed(0)}%)`
+        : "✗ プリセットのレンジ外(通常フォールド域)";
+  return (
+    <div className="preflop-eval">
+      <span>
+        プリフロップ: <b>{actions || "—"}</b>
+      </span>
+      <span className={cls}>{label}</span>
+    </div>
+  );
+}
+
 export default function ImageAnalyze({
   onClose,
   onOpenInSolver,
@@ -131,7 +158,9 @@ export default function ImageAnalyze({
         pot: s.pot!,
         stack: s.stack!,
         betsFlop: "33", betsTurn: "75", betsRiver: "75",
-        raisesFlop: "60", raisesTurn: "", raisesRiver: "",
+        // include raises on every street so a turn/river raise in the actual
+        // line can be navigated (ranges in image spots are narrow → affordable)
+        raisesFlop: "60", raisesTurn: "60", raisesRiver: "60",
         maxBets: 2, allinThreshold: 0,
         rangeOop: s.oopRange!, rangeIp: s.ipRange!,
         oopName: s.oop!, ipName: s.ip!,
@@ -207,6 +236,7 @@ export default function ImageAnalyze({
             {scen.opener} vs {scen.defender}・{hand?.potType === "3bp" ? "3betポット" : hand?.potType === "4bp" ? "4betポット" : "SRP"}
             ・ヒーロー {scen.hero}（{scen.heroIsOop ? "OOP" : "IP"}）
           </h2>
+          {hand && <PreflopEval hand={hand} scen={scen} />}
           {evalRes.postflop.length === 0 ? (
             <p className="hint">評価対象のポストフロップ決定がありません。{evalRes.truncatedReason}</p>
           ) : (

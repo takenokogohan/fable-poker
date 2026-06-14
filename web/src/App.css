@@ -633,6 +633,18 @@ label {
   font-weight: 600;
 }
 
+.preflop-eval {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
 /* ---- touch ---- */
 .paint-matrix {
   touch-action: none; /* drag paints instead of scrolling */

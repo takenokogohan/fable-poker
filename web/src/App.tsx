@@ -180,6 +180,22 @@ export default function App() {
         setMeta(s.meta);
         targetRef.current = config.targetIterations;
 
+        // phones crash (tab reload) when a solve's storage approaches the tab
+        // memory limit — refuse oversized spots up front instead of crashing
+        const MOBILE_STORAGE_BUDGET_MB = 250;
+        if (isMobileLike() && s.meta.totalStorageMB > MOBILE_STORAGE_BUDGET_MB) {
+          s.terminate();
+          session.current = null;
+          setError(
+            `このスポットはモバイルには大きすぎます(約${s.meta.totalStorageMB.toFixed(0)} MB)。` +
+              `フロップ全体の解析(特に広いSRP)はメモリ上限を超えてタブが落ちるため、` +
+              `ターン/リバー解析(ボード4〜5枚)にする・レンジの広さを「タイト」にする・3bet/4betポットを選ぶ、` +
+              `のいずれかをお試しください。PCでは実行できます。`
+          );
+          setPhase("config");
+          return;
+        }
+
         if (cached) {
           try {
             await s.importStates(cached.states);
