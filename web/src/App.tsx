@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
-import { SolverSession, chooseWorkers } from "./cluster";
+import { SolverSession, chooseWorkers, isMobileLike } from "./cluster";
 import CardPicker from "./components/CardPicker";
 import HandDetail from "./components/HandDetail";
 import SpotConfigView from "./components/SpotConfig";
@@ -91,6 +91,13 @@ export default function App() {
   const saveToCache = useCallback(async () => {
     const s = session.current;
     if (!s || s.iterations <= savedIterRef.current) return;
+    // exporting a full flop solve to IndexedDB spikes memory and crashes the
+    // tab on phones — skip caching flop solves on mobile (turn/river are small)
+    const boardCards = (spot?.board.length ?? 0) / 2;
+    if (isMobileLike() && boardCards < 4) {
+      savedIterRef.current = s.iterations;
+      return;
+    }
     setCacheState("saving");
     try {
       const states = await s.exportStates();
@@ -244,7 +251,10 @@ export default function App() {
   if (phase === "image") {
     return (
       <div className="app">
-        <ImageAnalyze onClose={() => setPhase("config")} />
+        <ImageAnalyze
+          onClose={() => setPhase("config")}
+          onOpenInSolver={(cfg) => startSolve(cfg)}
+        />
       </div>
     );
   }

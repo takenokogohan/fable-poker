@@ -48,6 +48,14 @@ if (rows.length < 1) throw new Error("no evaluation rows");
 
 await page.screenshot({ path: process.env.TMPDIR + "/ui-image-analyze.png", fullPage: true });
 
+// "open in solver" → full strategy matrix
+await page.click('button:has-text("ソルバーで開く")');
+await page.waitForSelector(".solve-status", { timeout: 60000 });
+await page.waitForSelector(".strat-cell", { timeout: 300000 });
+const cells = await page.$$(".strat-cell");
+console.log("strategy cells after open-in-solver:", cells.length);
+if (cells.length !== 169) throw new Error("strategy matrix not shown");
+
 if (errors.length) { console.error("PAGE ERRORS:", errors.slice(0, 5)); process.exit(1); }
 console.log("IMAGE ANALYZE TEST PASSED");
 await browser.close();

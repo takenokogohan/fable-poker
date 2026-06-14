@@ -83,11 +83,18 @@ const ACTION_JA: Record<string, string> = {
   fold: "フォールド", check: "チェック", call: "コール", bet: "ベット", raise: "レイズ",
 };
 
-export default function ImageAnalyze({ onClose }: { onClose: () => void }) {
+export default function ImageAnalyze({
+  onClose,
+  onOpenInSolver,
+}: {
+  onClose: () => void;
+  onOpenInSolver: (cfg: SpotConfig) => void;
+}) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [hand, setHand] = useState<ParsedHand | null>(null);
   const [scen, setScen] = useState<SpotMapping | null>(null);
   const [evalRes, setEvalRes] = useState<HandEvaluation | null>(null);
+  const [solveCfg, setSolveCfg] = useState<SpotConfig | null>(null);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const sessionRef = useRef<SolverSession | null>(null);
@@ -95,7 +102,15 @@ export default function ImageAnalyze({ onClose }: { onClose: () => void }) {
   const reset = () => {
     sessionRef.current?.terminate();
     sessionRef.current = null;
-    setHand(null); setScen(null); setEvalRes(null); setProgress(""); setError("");
+    setHand(null); setScen(null); setEvalRes(null); setSolveCfg(null); setProgress(""); setError("");
+  };
+
+  // hand the spot to the full solver UI (frees this screen's session first)
+  const openInSolver = () => {
+    if (!solveCfg) return;
+    sessionRef.current?.terminate();
+    sessionRef.current = null;
+    onOpenInSolver(solveCfg);
   };
 
   async function onFile(file: File | undefined) {
@@ -122,6 +137,7 @@ export default function ImageAnalyze({ onClose }: { onClose: () => void }) {
         oopName: s.oop!, ipName: s.ip!,
         targetIterations: 200,
       };
+      setSolveCfg(cfg);
       const workers = isMobileDevice() ? 0 : chooseWorkers(3);
       const session = await SolverSession.create(buildConfigText(cfg), workers);
       sessionRef.current = session;
@@ -214,8 +230,12 @@ export default function ImageAnalyze({ onClose }: { onClose: () => void }) {
           {evalRes.truncatedReason && evalRes.postflop.length > 0 && (
             <p className="hint">注: {evalRes.truncatedReason}(以降は未評価)</p>
           )}
+          <button className="solve-btn" onClick={openInSolver}>
+            🔍 このスポットをソルバーで開く(レンジ全体の戦略を見る)
+          </button>
           <p className="hint">
             ※ プリフロップとレンジは標準プリセットによる近似です。ベットサイズは簡易ツリー(フロップ33%/ターン・リバー75%)に丸めています。
+            上のボタンで本体ソルバーが開き、13×13マトリクスでレンジ全体のアクション頻度や、セルをタップしてコンボ別の頻度・EV・エクイティを確認できます。
           </p>
         </section>
       )}

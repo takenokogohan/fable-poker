@@ -277,9 +277,20 @@ export class SolverSession {
   }
 }
 
+/** phones can't hold the cluster's per-worker tree copies (nor export them all
+ * to IndexedDB after solving) without OOMing and reloading the tab */
+export function isMobileLike(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    navigator.maxTouchPoints > 1 &&
+    Math.min(screen.width, screen.height) < 820
+  );
+}
+
 /** pick the worker count for a spot */
 export function chooseWorkers(boardCards: number): number {
   if (boardCards >= 5) return 0; // river solves are fast single-instance
+  if (isMobileLike()) return 0; // monolithic on mobile: one tree copy, no OOM
   const hc = navigator.hardwareConcurrency || 4;
   return Math.min(8, Math.max(2, hc - 2));
 }
