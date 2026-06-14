@@ -3,6 +3,17 @@
 
 import { useRef, useState } from "react";
 import { SolverSession, chooseWorkers } from "../cluster";
+
+/** Phones can't hold the cluster's per-worker tree copies for a flop solve —
+ * it OOMs and Safari reloads the tab. Solve monolithically (one instance) on
+ * mobile; the image solve is a small one-off so the speed hit is fine. */
+function isMobileDevice(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    navigator.maxTouchPoints > 1 &&
+    Math.min(screen.width, screen.height) < 820
+  );
+}
 import { handToScenario, type SpotMapping } from "../handImage/analyze";
 import { parseHand, type ParsedHand } from "../handImage/parse";
 import { evaluateHand, type HandEvaluation } from "../handImage/evaluate";
@@ -111,7 +122,8 @@ export default function ImageAnalyze({ onClose }: { onClose: () => void }) {
         oopName: s.oop!, ipName: s.ip!,
         targetIterations: 200,
       };
-      const session = await SolverSession.create(buildConfigText(cfg), chooseWorkers(3));
+      const workers = isMobileDevice() ? 0 : chooseWorkers(3);
+      const session = await SolverSession.create(buildConfigText(cfg), workers);
       sessionRef.current = session;
       const target = 200;
       while (session.iterations < target) {
