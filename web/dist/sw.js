@@ -1,5 +1,5 @@
-self.__PRECACHE__ = ["/assets/index-BhANsw66.css","/assets/index-MOoxBEb9.js","/assets/worker-D_0vyfU-.js"];
-self.__BUILD__ = "63a629e93438";
+self.__PRECACHE__ = ["/assets/index-BhANsw66.css","/assets/index-D3E_CdD0.js","/assets/worker-D_0vyfU-.js"];
+self.__BUILD__ = "ad79ebb881db";
 // Offline support. Hashed /assets/* files are cached forever (cache-first);
 // the shell, the wasm and the manifest are network-first with cache fallback
 // so updates land when online and everything still works offline.

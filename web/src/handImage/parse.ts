@@ -40,20 +40,20 @@ const card = (rank: string, suit: Suit) => rank + suit;
 
 export function parseHand(img: RgbaImage): ParsedHand {
   const warnings: string[] = [];
-  const cards = detectCards(img);
   const { list } = detectTags(img);
 
-  // map each player-list row to a position by vertical order, attach cards
+  // player-list rows (always UTG→BB top to bottom) are the reliable row anchors
   const listRows = list.slice(0, 6).sort((a, b) => a.cy - b.cy);
+  // anchor the hole-card grid to the list-tag rows so a row whose cards weren't
+  // detected as vivid chips (e.g. an all-spade or partly-cut top row) still
+  // maps to the correct player.
+  const cards = detectCards(img, listRows.map((t) => t.cy));
+
   const players: ParsedHand["players"] = [];
   let heroIdx = 0, heroBright = -1;
   listRows.forEach((tag, i) => {
     const pos = LIST_ORDER[i] ?? "BB";
-    // find the hole-card row nearest this tag
-    const row = cards.holeRows.reduce(
-      (best, r) => (Math.abs(r.cy - tag.cy) < Math.abs(best.cy - tag.cy) ? r : best),
-      cards.holeRows[0]
-    );
+    const row = cards.holeRows[i]; // 1:1 with list rows
     const cs = row
       ? row.cards.map((c) => {
           const { rank } = readRank(img, Math.round(c.cx), Math.round(row.cy), cards.chipW, cards.chipH);

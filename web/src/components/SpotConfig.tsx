@@ -296,6 +296,9 @@ export default function SpotConfigView({ onSolve }: Props) {
             className={boardValid ? "" : "invalid"}
           />
           <button onClick={randomFlop}>ランダムフロップ</button>
+          <button onClick={() => setBoardText("")} disabled={board.length === 0}>
+            クリア
+          </button>
         </div>
         <CardPicker
           selected={board}

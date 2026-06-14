@@ -74,15 +74,33 @@ function isNavyBg(r: number, g: number, b: number): boolean {
   return v < 0.28;
 }
 
-/** Classify a card slot by sampling its background colour: a missed vivid chip
- * must read as its real suit, not default to spade. Returns null for empty. */
-function slotSuit(img: RgbaImage, cx: number, cy: number, chipW: number): Suit | null {
-  const [r, g, b] = sampleBox(img, cx, cy, Math.round(chipW * 0.3));
-  const v = vividSuit(r, g, b);
-  if (v) return v;
-  if (isSpadeBg(r, g, b)) return "s";
-  if (!isNavyBg(r, g, b)) return "s";
-  return null;
+/** Classify a card slot by sampling its background colour. Samples the chip
+ * area ABOVE the centered rank glyph (pure background) — sampling the centre
+ * mixes in the white glyph and desaturates the colour, which would misread a
+ * vivid chip (e.g. a blue diamond) as spade. Returns null for an empty slot. */
+function slotSuit(img: RgbaImage, cx: number, cy: number, chipW: number, chipH: number): Suit | null {
+  const half = Math.round(chipW * 0.16);
+  const oy = Math.round(chipH * 0.28);
+  const ox = Math.round(chipW * 0.26);
+  const pts: [number, number][] = [
+    [cx, cy - oy],
+    [cx - ox, cy - oy],
+    [cx + ox, cy - oy],
+  ];
+  const votes: Record<Suit, number> = { h: 0, d: 0, c: 0, s: 0 };
+  let navy = 0;
+  for (const [sx, sy] of pts) {
+    const [r, g, b] = sampleBox(img, sx, sy, half);
+    const v = vividSuit(r, g, b);
+    if (v) { votes[v]++; continue; }
+    if (isSpadeBg(r, g, b)) { votes.s++; continue; }
+    if (isNavyBg(r, g, b)) navy++;
+  }
+  const top = (Object.entries(votes) as [Suit, number][])
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])[0];
+  if (top) return top[0];
+  return navy >= pts.length ? null : "s";
 }
 
 const CHIP_MIN_W = 26, CHIP_MAX_W = 58, CHIP_MIN_H = 36, CHIP_MAX_H = 64;
@@ -191,7 +209,7 @@ export interface DetectedCards {
  * Locate all card slots and assign suits. Colored chips anchor the grid;
  * spade slots (no vivid chip) are recovered by sampling the slot background.
  */
-export function detectCards(img: RgbaImage): DetectedCards {
+export function detectCards(img: RgbaImage, rowAnchors?: number[]): DetectedCards {
   const { width: W } = img;
   const chips = vividChips(img);
   const chipW = median(chips.map((c) => c.w)) || 38;
@@ -201,9 +219,6 @@ export function detectCards(img: RgbaImage): DetectedCards {
   const hole = chips.filter((c) => c.cx > W * 0.6);
   const boardChips = chips.filter((c) => c.cx < W * 0.5);
 
-  // Ten-Four always shows 6 players. Colored chips anchor the grid, but a row
-  // whose two hole cards are both spades has no vivid anchor — so we lock a
-  // 6-row grid from the detected rows' pitch and recover the rest by sampling.
   const detYs = cluster(hole.map((c) => c.cy), chipH * 0.6);
   let colXs = cluster(hole.map((c) => c.cx), chipW * 0.6);
   const pitch =
@@ -212,21 +227,28 @@ export function detectCards(img: RgbaImage): DetectedCards {
   if (colXs.length === 1) colXs = [colXs[0], colXs[0] + chipW * 1.1].sort((a, b) => a - b);
   colXs = colXs.slice(0, 2);
 
-  // anchor the top row: probe one pitch above the topmost detected row in case
-  // the top (UTG) row is itself all-spade
-  let top = detYs[0];
-  const probeUp = top - pitch;
-  if (probeUp > pitch * 0.5) {
-    const spadeAbove = colXs.some((cx) => {
-      const [r, g, b] = sampleBox(img, Math.round(cx), Math.round(probeUp), Math.round(chipW * 0.3));
-      return isSpadeBg(r, g, b);
-    });
-    if (spadeAbove) top = probeUp;
+  // Row anchors: prefer the caller's (the player-list tag cys, reliable for all
+  // 6 rows incl. ones whose cards weren't detected as vivid chips). Otherwise
+  // lock a 6-row grid from the detected pitch, probing one row up in case the
+  // top (UTG) row is all-spade.
+  let rowYs: number[];
+  if (rowAnchors && rowAnchors.length >= 2) {
+    rowYs = rowAnchors;
+  } else {
+    let top = detYs[0] ?? 0;
+    const probeUp = top - pitch;
+    if (probeUp > pitch * 0.5) {
+      const spadeAbove = colXs.some((cx) => {
+        const [r, g, b] = sampleBox(img, Math.round(cx), Math.round(probeUp), Math.round(chipW * 0.3));
+        return isSpadeBg(r, g, b);
+      });
+      if (spadeAbove) top = probeUp;
+    }
+    rowYs = Array.from({ length: 6 }, (_, ri) => top + ri * pitch);
   }
 
   const holeRows: DetectedCards["holeRows"] = [];
-  for (let ri = 0; ri < 6; ri++) {
-    const ry = top + ri * pitch;
+  for (const ry of rowYs) {
     const cards: { cx: number; suit: Suit }[] = [];
     for (const cxCol of colXs) {
       const hit = hole.find(
@@ -236,10 +258,10 @@ export function detectCards(img: RgbaImage): DetectedCards {
         cards.push({ cx: cxCol, suit: hit.suit });
         continue;
       }
-      const s = slotSuit(img, Math.round(cxCol), Math.round(ry), chipW);
+      const s = slotSuit(img, Math.round(cxCol), Math.round(ry), chipW, chipH);
       if (s) cards.push({ cx: cxCol, suit: s });
     }
-    if (cards.length) holeRows.push({ cy: ry, cards });
+    holeRows.push({ cy: ry, cards });
   }
 
   // Board cards sit on the left under each street label: flop = 3 in a row,
@@ -260,7 +282,7 @@ export function detectCards(img: RgbaImage): DetectedCards {
           board.push({ cx: hit.cx, cy: ry, suit: hit.suit });
           continue;
         }
-        const s = slotSuit(img, Math.round(cx), Math.round(ry), chipW);
+        const s = slotSuit(img, Math.round(cx), Math.round(ry), chipW, chipH);
         if (s) board.push({ cx, cy: ry, suit: s });
         else break; // empty slot → end of this street's cards
       }
