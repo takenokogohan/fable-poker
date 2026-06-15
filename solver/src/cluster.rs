@@ -991,4 +991,93 @@ mod tests {
             }
         }
     }
+
+    /// Tiny flop spot, fast — localize the distributed-BR bug by worker count.
+    #[test]
+    fn cluster_br_flop_tiny() {
+        let board = "Ks7h2d";
+        let b = parse_board(board).unwrap();
+        let mut g0 = [0f32; 169];
+        g0[0] = 1.0; // AA
+        g0[28] = 1.0; // QQ
+        let mut g1 = [0f32; 169];
+        g1[14] = 1.0; // KK
+        g1[42] = 1.0; // JJ
+        let w0 = expand_grid_weights(&g0, &b);
+        let w1 = expand_grid_weights(&g1, &b);
+        // No CFR — uniform avg strategy. The distributed best-response total
+        // must be identical across worker counts (same strategy, just a
+        // different partition). Catches the shared-river-board ownership bug.
+        let distributed_br = |k: u8| -> f64 {
+            let main = Game::new(cfg(board, Partition::Main { workers: k }), &w0, &w1).unwrap();
+            let mut workers: Vec<Game> = (0..k)
+                .map(|i| Game::new(cfg(board, Partition::Worker { workers: k, idx: i }), &w0, &w1).unwrap())
+                .collect();
+            let mut br = 0f64;
+            for p in 0..2usize {
+                let tasks = main.br_begin(p);
+                let mut values = ChanceValues::new();
+                for w in workers.iter_mut() {
+                    sum_partials(&mut values, w.subtree_run(MODE_BR, p, 0.0, &tasks));
+                }
+                br += main.br_finish(p, &values);
+            }
+            br
+        };
+        let br1 = distributed_br(1);
+        let br2 = distributed_br(2);
+        let br3 = distributed_br(3);
+        println!("uniform-strategy distributed BR: k1={:.4} k2={:.4} k3={:.4}", br1, br2, br3);
+        assert!((br1 - br2).abs() < 1e-2, "k1 {} vs k2 {}", br1, br2);
+        assert!((br1 - br3).abs() < 1e-2, "k1 {} vs k3 {}", br1, br3);
+    }
+
+    /// Flop spot (two chance levels: turn + river). The original test only
+    /// covered a turn spot; the distributed best-response must still match the
+    /// monolithic one — and exploitability must never be negative.
+    #[test]
+    fn cluster_exploitability_flop() {
+        let board = "Ks7h2d"; // flop → turn & river dealt inside the tree
+        let (w0, w1) = ranges(board);
+        let k = 3u8;
+        let mut mono = Game::new(cfg(board, Partition::None), &w0, &w1).unwrap();
+        let mut main = Game::new(cfg(board, Partition::Main { workers: k }), &w0, &w1).unwrap();
+        let mut workers: Vec<Game> = (0..k)
+            .map(|i| Game::new(cfg(board, Partition::Worker { workers: k, idx: i }), &w0, &w1).unwrap())
+            .collect();
+
+        let iters = 30;
+        mono.run_iterations(iters);
+        for _ in 0..iters {
+            for p in 0..2usize {
+                let weight = main.current_weight();
+                let tasks = main.iter_begin(p);
+                let mut values = ChanceValues::new();
+                for w in workers.iter_mut() {
+                    sum_partials(&mut values, w.subtree_run(MODE_CFR, p, weight, &tasks));
+                }
+                main.iter_finish(p, &values);
+            }
+        }
+
+        let mut br_total = 0f64;
+        for p in 0..2usize {
+            let tasks = main.br_begin(p);
+            let mut values = ChanceValues::new();
+            for w in workers.iter_mut() {
+                sum_partials(&mut values, w.subtree_run(MODE_BR, p, 0.0, &tasks));
+            }
+            br_total += main.br_finish(p, &values);
+        }
+        let expl_cluster = ((br_total / main.pair_weight()) - main.tree.dead as f64) / 2.0;
+        let expl_mono = mono.exploitability() as f64;
+        println!("flop: cluster {} vs mono {}", expl_cluster, expl_mono);
+        assert!(expl_cluster >= -1e-3, "negative exploitability: {}", expl_cluster);
+        assert!(
+            (expl_cluster - expl_mono).abs() < 0.03 * 10.0,
+            "cluster {} vs mono {}",
+            expl_cluster,
+            expl_mono
+        );
+    }
 }

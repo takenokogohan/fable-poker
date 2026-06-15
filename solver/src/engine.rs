@@ -652,18 +652,15 @@ impl Game {
             hands[1].combo_idx.iter().map(|&ci| inv[0][ci]).collect::<Vec<u16>>(),
         ];
 
-        // river infos (only for boards this instance can reach at showdown:
-        // the first dealt card determines the owning subtree)
-        let first_idx = tree.cfg.board.len();
+        // River infos for every distinct river board. These MUST be complete in
+        // every instance that reaches showdowns: river_boards are deduplicated by
+        // sorted card set, so the same 5-card board is shared between turn/river
+        // orderings dealt under different first-level (turn) cards — a worker can
+        // therefore reach a board whose stored turn card belongs to another
+        // worker. Skipping any here silently zeros those showdowns (the cluster
+        // flop bug). The cost is small (~MBs) vs the strategy storage.
         let mut river_infos = Vec::with_capacity(tree.river_boards.len());
         for board in &tree.river_boards {
-            let owned = first_idx >= 5 || tree.cfg.partition.owns_subtree(board[first_idx]);
-            if !owned {
-                river_infos.push(RiverInfo {
-                    sorted: [Vec::new(), Vec::new()],
-                });
-                continue;
-            }
             let mut sorted: [Vec<(u32, u16)>; 2] = [Vec::new(), Vec::new()];
             for p in 0..2 {
                 let mut v: Vec<(u32, u16)> = (0..hands[p].len())
