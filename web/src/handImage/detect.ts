@@ -209,7 +209,44 @@ export interface DetectedCards {
  * Locate all card slots and assign suits. Colored chips anchor the grid;
  * spade slots (no vivid chip) are recovered by sampling the slot background.
  */
-export function detectCards(img: RgbaImage, rowAnchors?: number[]): DetectedCards {
+/** center y of the first card-height block of non-navy pixels at column x
+ * within [y0,y1] — finds a board card row even when it's a spade (no vivid
+ * chip). Header text gives only short, broken runs, so it's rejected. */
+function findCardCy(
+  img: RgbaImage,
+  x: number,
+  y0: number,
+  y1: number,
+  chipH: number
+): number {
+  const need = Math.round(chipH * 0.6);
+  let runStart = -1;
+  for (let y = Math.max(0, y0); y <= Math.min(img.height - 1, y1); y++) {
+    const [r, g, b] = sampleBox(img, x, y, 4);
+    if (!isNavyBg(r, g, b)) {
+      if (runStart < 0) runStart = y;
+      if (y - runStart + 1 >= need) {
+        // extend to the end of the run for an accurate center
+        let end = y;
+        while (end < Math.min(img.height - 1, y1 + chipH)) {
+          const [rr, gg, bb] = sampleBox(img, x, end + 1, 4);
+          if (isNavyBg(rr, gg, bb)) break;
+          end++;
+        }
+        return Math.round((runStart + end) / 2);
+      }
+    } else {
+      runStart = -1;
+    }
+  }
+  return -1;
+}
+
+export function detectCards(
+  img: RgbaImage,
+  rowAnchors?: number[],
+  boardBands?: [number, number][]
+): DetectedCards {
   const { width: W } = img;
   const chips = vividChips(img);
   const chipW = median(chips.map((c) => c.w)) || 38;
@@ -265,30 +302,47 @@ export function detectCards(img: RgbaImage, rowAnchors?: number[]): DetectedCard
   }
 
   // Board cards sit on the left under each street label: flop = 3 in a row,
-  // turn = 1, river = 1, each starting at the same left margin. Scan each
-  // street row left→right by card pitch, classifying each slot, until empty.
+  // turn = 1, river = 1, each starting at the same left margin.
   const board: DetectedCards["board"] = [];
-  if (boardChips.length) {
-    const boardRowYs = cluster(boardChips.map((c) => c.cy), chipH * 0.6);
-    const pitch = chipW * 1.18; // chip width + gap (≈45px at 840w)
-    const x0 = Math.min(...boardChips.map((c) => c.cx)); // left margin (≈61)
-    for (const ry of boardRowYs) {
-      for (let k = 0; k < 5; k++) {
-        const cx = x0 + k * pitch;
-        const hit = boardChips.find(
-          (c) => Math.abs(c.cy - ry) < chipH * 0.6 && Math.abs(c.cx - cx) < chipW * 0.55
-        );
-        if (hit) {
-          board.push({ cx: hit.cx, cy: ry, suit: hit.suit });
-          continue;
-        }
-        const s = slotSuit(img, Math.round(cx), Math.round(ry), chipW, chipH);
-        if (s) board.push({ cx, cy: ry, suit: s });
-        else break; // empty slot → end of this street's cards
+  const boardPitch = chipW * 1.18; // chip width + gap (≈45px at 840w)
+  const x0 = boardChips.length
+    ? Math.min(...boardChips.map((c) => c.cx))
+    : Math.round(chipW * 1.6); // left margin (≈61 at 840w)
+  const scanRow = (ry: number) => {
+    for (let k = 0; k < 5; k++) {
+      const cx = x0 + k * boardPitch;
+      const hit = boardChips.find(
+        (c) => Math.abs(c.cy - ry) < chipH * 0.6 && Math.abs(c.cx - cx) < chipW * 0.55
+      );
+      if (hit) {
+        board.push({ cx: hit.cx, cy: ry, suit: hit.suit });
+        continue;
       }
+      const s = slotSuit(img, Math.round(cx), Math.round(ry), chipW, chipH);
+      if (s) board.push({ cx, cy: ry, suit: s });
+      else break; // empty slot → end of this street's cards
     }
-    board.sort((a, b) => a.cy - b.cy || a.cx - b.cx);
+  };
+
+  // Collect candidate board-row centers from BOTH the action-street bands
+  // (catches spade-only rows with no vivid chip) and the vivid board chips
+  // (never regress a row we can already see). Dedup rows that coincide.
+  const candidateYs: number[] = [];
+  if (boardBands) {
+    for (const [by0, by1] of boardBands) {
+      const cy = findCardCy(img, Math.round(x0), Math.round(by0 - chipH * 0.2), Math.round(by1 + chipH), chipH);
+      if (cy >= 0) candidateYs.push(cy);
+    }
   }
+  for (const ry of cluster(boardChips.map((c) => c.cy), chipH * 0.6)) candidateYs.push(ry);
+  candidateYs.sort((a, b) => a - b);
+  let lastY = -1e9;
+  for (const ry of candidateYs) {
+    if (ry - lastY < chipH * 0.6) continue; // same row already scanned
+    lastY = ry;
+    scanRow(ry);
+  }
+  board.sort((a, b) => a.cy - b.cy || a.cx - b.cx);
 
   return { holeRows, board, chipW, chipH };
 }

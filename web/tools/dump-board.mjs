@@ -1,0 +1,17 @@
+import { PNG } from "pngjs";
+import { readFileSync, mkdtempSync } from "fs";
+import { execSync } from "child_process";
+import { tmpdir } from "os";
+import { join } from "path";
+const file = process.argv[2];
+const out = join(mkdtempSync(join(tmpdir(), "tf-")), "detect.mjs");
+execSync(`npx esbuild ${new URL("../src/handImage/detect.ts", import.meta.url).pathname} --bundle --format=esm --outfile=${out}`, { stdio: "pipe" });
+const { _debugChips, detectActionStreets, detectTags } = await import(out);
+const png = PNG.sync.read(readFileSync(file));
+const img = { width: png.width, height: png.height, data: png.data };
+const chips = _debugChips(img).filter((c) => c.cx < img.width * 0.5);
+console.log("board-region vivid chips (cx,cy,suit):");
+for (const c of chips.sort((a, b) => a.cy - b.cy)) console.log(`  (${c.cx.toFixed(0)},${c.cy.toFixed(0)}) ${c.suit}`);
+const groups = detectActionStreets(img);
+console.log("action groups (first row cy / rows cys):");
+groups.forEach((g, i) => console.log(`  g${i}: cys=[${g.map((r) => r.cy.toFixed(0)).join(",")}]`));

@@ -44,10 +44,16 @@ export function parseHand(img: RgbaImage): ParsedHand {
 
   // player-list rows (always UTG→BB top to bottom) are the reliable row anchors
   const listRows = list.slice(0, 6).sort((a, b) => a.cy - b.cy);
+  // postflop action-street bands anchor the board rows (so a street whose only
+  // card is a spade — no vivid chip — is still found).
+  const groups = detectActionStreets(img);
+  const boardBands: [number, number][] = groups
+    .slice(1)
+    .map((g) => [g[0].cy, g[g.length - 1].cy]);
   // anchor the hole-card grid to the list-tag rows so a row whose cards weren't
   // detected as vivid chips (e.g. an all-spade or partly-cut top row) still
   // maps to the correct player.
-  const cards = detectCards(img, listRows.map((t) => t.cy));
+  const cards = detectCards(img, listRows.map((t) => t.cy), boardBands);
 
   const players: ParsedHand["players"] = [];
   let heroIdx = 0, heroBright = -1;
@@ -87,8 +93,7 @@ export function parseHand(img: RgbaImage): ParsedHand {
     return bd < 0.25 ? best : null;
   };
 
-  // action streets
-  const groups = detectActionStreets(img);
+  // action streets (groups already computed above for board anchoring)
   const nPost = (board.length >= 3 ? 1 : 0) + (board.length >= 4 ? 1 : 0) + (board.length >= 5 ? 1 : 0);
   const streetNames: ParsedHand["streets"][number]["street"][] = ["preflop", "flop", "turn", "river"];
   const streets: ParsedHand["streets"] = [];
